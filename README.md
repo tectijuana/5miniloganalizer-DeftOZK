@@ -7,6 +7,8 @@
 * **Institución:** TECNM Campus ITT
 * **Fecha:** 22 de abril de 2026
 
+.
+
 ---
 
 ## 1. Variante Asignada y Solución Implementada
