@@ -7,8 +7,6 @@
 * **Institución:** TECNM Campus ITT
 * **Fecha:** 22 de abril de 2026
 
-.
-
 ---
 
 ## 1. Variante Asignada y Solución Implementada
@@ -67,6 +65,12 @@ A continuación, se presenta la validación manual utilizando los datos de prueb
 ``` cat data/logs_C.txt | ./analyzer ```
 
 <img width="797" height="100" alt="Captura de pantalla 2026-04-22 033443" src="https://github.com/user-attachments/assets/4f746f12-c9a7-4c2a-a307-2828c5d373eb" />
+
+<br>
+
+**Video de asciinema como evidencia del funcionamiento:**
+
+https://asciinema.org/a/AtomaayIEEvciLUj
 
 ---
 
