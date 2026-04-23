@@ -1,165 +1,85 @@
+# Práctica 4.2: Mini Cloud Log Analyzer - Variante C
 
-# Práctica 1
-
-## Implementación de un Mini Cloud Log Analyzer en ARM64
-
-**Modalidad:** Individual
-**Entorno de trabajo:** AWS Ubuntu ARM64 + GitHub Classroom
-**Lenguaje:** ARM64 Assembly (GNU Assembler) + Bash + GNU Make
-
----
-
-## Introducción
-
-Los sistemas modernos de cómputo en la nube generan continuamente registros (*logs*) que permiten monitorear el estado de servicios, detectar fallas y activar alertas ante eventos críticos.
-
-En esta práctica se desarrollará un módulo simplificado de análisis de logs, implementado en **ARM64 Assembly**, inspirado en tareas reales de monitoreo utilizadas en sistemas cloud, observabilidad y administración de infraestructura.
-
-El programa procesará códigos de estado HTTP suministrados mediante entrada estándar (stdin):
-
-```bash id="y1gcmc"
-cat logs.txt | ./analyzer
-```
+## Autor
+* **Nombre:** Torres Moreno Diego Antonio
+* **Matrícula:** 23212077
+* **Asignatura:** Lenguajes de Interfaz
+* **Institución:** TECNM Campus ITT
+* **Fecha:** 22 de abril de 2026
 
 ---
 
-## Objetivo general
+## 1. Variante Asignada y Solución Implementada
+**Variante C: Detectar la primera aparición de 503.**
 
-Diseñar e implementar, en lenguaje ensamblador ARM64, una solución para procesar registros de eventos y detectar condiciones definidas según la variante asignada.
-
----
-
-## Objetivos específicos
-
-El estudiante aplicará:
-
-* programación en ARM64 bajo Linux
-* manejo de registros
-* direccionamiento y acceso a memoria
-* instrucciones de comparación
-* estructuras iterativas en ensamblador
-* saltos condicionales
-* uso de syscalls Linux
-* compilación con GNU Make
-* control de versiones con GitHub Classroom
-
-Estos temas se alinean con contenidos clásicos de flujo de control, herramientas GNU, manejo de datos y convenciones de programación en ensamblador.   
+La solución requerida modifica el comportamiento de un analizador de logs HTTP tradicional. En lugar de contar y clasificar todos los códigos hasta el final del archivo, este analizador se maneja en modo de **monitoreo crítico (Early Exit)**. Lee el flujo de datos y, al detectar el primer evento `503 Service Unavailable`, detiene inmediatamente la ejecución y manda una alerta, ignorando cualquier registro posterior.
 
 ---
 
-## Material proporcionado
+## 2. Diseño y Lógica Utilizada (A nivel Ensamblador)
+El código fue escrito exclusivamente en ensamblador ARM64, evitando la biblioteca estándar de C (`libc`) y comunicándose directamente con el kernel de Linux a través de llamadas al sistema (*syscalls*).
 
-Se entregará un repositorio preconfigurado que contiene:
+### Máquina de Estados y Flujo de Control:
+1. **Lectura en Bloques:** Se utiliza la syscall `read` (x8 = 63) para cargar hasta 4096 bytes de la entrada estándar (`stdin`) a un buffer en memoria, optimizando las operaciones de E/S.
+ 
+2. **Parser de Enteros Cíclico:** El programa itera byte por byte. Si el carácter ASCII está entre '0' y '9', lo convierte a su valor decimal y lo acumula usando desplazamientos en base 10 (`numero_actual = numero_actual * 10 + digito`).
 
-* plantilla base en ARM64
-* archivo `Makefile`
-* script Bash de ejecución
-* archivo de datos (`logs.txt`)
-* pruebas iniciales
-* secciones marcadas con `TODO`
-
-El estudiante deberá completar la lógica correspondiente.
-
----
-
-## Variantes de la práctica
-
-### Variante A
-
-Contabilizar:
-
-* respuestas exitosas (2xx)
-* errores del cliente (4xx)
-* errores del servidor (5xx)
+3. **Condición de Alerta (Branching):** Al detectar un salto de línea (`\n`), el analizador evalúa el número parseado:
+   - Se ejecuta una comparación directa: `cmp x22, #503`.
+   - Si coincide (`b.eq`), el flujo salta inmediatamente a la etiqueta `alerta_503`, la cual invoca la syscall `write` (x8 = 64) para imprimir la alerta crítica y luego ejecuta `exit` (x8 = 93), garantizando que se cumpla la condición de **"primera aparición"**.
+    
+4. **Manejo de Casos Borde:** Si la syscall `read` devuelve `0` (EOF - Fin de archivo) sin haber detectado un 503, el programa imprime un mensaje de estado `[OK]` y finaliza limpiamente.
 
 ---
 
-### Variante B
+## 3. Archivo Fuente Funcional y Arquitectura
 
-Determinar el código de estado más frecuente.
+* **Archivo fuente:** El código se encuentra en `src/analyzer.s`.
+* **Adaptación a Entorno Termux (Android):** Durante el desarrollo, se me presentó el error de arquitectura `unexpected e_type: 2`. Llegue a la conclusión de que las políticas de seguridad del sistema necesitaban que los ejecutables sean independientes de la posición. Lo pude solucionar enlazando el binario con el flag `-pie` (`ld -pie -o analyzer analyzer.o`).
+* 
 
----
+**Proceso de compilación y enlazado en entorno ARM64:**
 
-### Variante C
-
-Detectar el primer evento crítico (503).
-
----
-
-### Variante D
-
-Detectar tres errores consecutivos.
+<img width="1055" height="145" alt="Captura de pantalla 2026-04-22 025422" src="https://github.com/user-attachments/assets/53a9876f-036f-4c4a-a7a7-4c5307744f05" />
 
 ---
 
-### Variante E
+## 4. Evidencia de Ejecución
 
-Calcular índice de salud:
+Generación de archivos de prueba personalizados ('test_ok.txt' y 'test_error.txt') mediante el comando echo:**
 
-```text id="2u4vvx"
-Health Score = 100 - (errores × 10)
-```
+<img width="918" height="39" alt="Captura de pantalla 2026-04-22 025910" src="https://github.com/user-attachments/assets/038dc454-736b-449d-95ae-1d11514b471c" />
 
----
+<br>
 
-## Compilación
+**Prueba de Caso Negativo. Al procesar el archivo 'test_ok.txt', el analizador recorre la secuencia completa sin activar alertas, confirmando que no se detectaron eventos 503 y finalizando con un estado de éxito [OK]:**
 
-```bash id="bmubtb"
-make
-```
+<img width="718" height="86" alt="Captura de pantalla 2026-04-22 031652" src="https://github.com/user-attachments/assets/6b669f13-e5e3-4d65-b8f3-b5d5dfe9515a" />
 
----
+<br>
 
-## Ejecución
+A continuación, se presenta la validación manual utilizando los datos de prueba asignados (`data/logs_C.txt`):
 
-```bash id="gcqlf2"
-cat logs.txt | ./analyzer
-```
+**Comando ejecutado:**
 
----
+``` cat data/logs_C.txt | ./analyzer ```
 
-## Entregables
+<img width="797" height="100" alt="Captura de pantalla 2026-04-22 033443" src="https://github.com/user-attachments/assets/4f746f12-c9a7-4c2a-a307-2828c5d373eb" />
 
-Cada estudiante deberá entregar en su repositorio:
+<br>
 
-* archivo fuente ARM64 funcional
-* solución implementada
-* README explicando diseño y lógica utilizada
-* evidencia de ejecución
-* commits realizados en GitHub Classroom
+**Video de asciinema como evidencia del funcionamiento:**
+
+https://asciinema.org/a/AtomaayIEEvciLUj
 
 ---
 
-## Criterios de evaluación
+## 5. Trazabilidad y Commits en GitHub Classroom
 
-| Criterio                    | Ponderación |
-| --------------------------- | ----------- |
-| Compilación correcta        | 20%         |
-| Correctitud de la solución  | 35%         |
-| Uso adecuado de ARM64       | 25%         |
-| Documentación y comentarios | 10%         |
-| Evidencia de pruebas        | 10%         |
+Realice el desarrollo de esta solución utilizando control de versiones. Todo el progreso, refactorización de la lógica base a la Variante C, y ajustes de compilación para ARM64 quedaron registrados por medio de commits con descripción enviados directamente desde la terminal de Termux hasta este repositorio.
 
----
+<img width="703" height="583" alt="Captura de pantalla 2026-04-22 023202" src="https://github.com/user-attachments/assets/30abef62-0086-4334-a894-4eb2b7908763" />
 
-## Restricciones
+<br>
 
-No está permitido:
-
-* resolver la lógica en C
-* resolver la lógica en Python
-* modificar la variante asignada
-* omitir el uso de ARM64 Assembly
-
----
-
-## Competencia a desarrollar
-
-Comprender cómo un problema de procesamiento de datos es implementado a nivel máquina mediante instrucciones ARM64.
-
----
-
-## Nota
-
-Aunque este problema puede resolverse fácilmente en lenguajes de alto nivel, el propósito de la práctica es implementar **cómo lo resolvería la arquitectura**, no únicamente obtener el resultado.
-
+<img width="746" height="259" alt="Captura de pantalla 2026-04-22 031441" src="https://github.com/user-attachments/assets/8030436b-8b61-4948-876d-ab81424b03d4" />
